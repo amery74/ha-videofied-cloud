@@ -39,15 +39,40 @@ class VideofiedCloudApi:
     def _client_challenge(self) -> str:
         return self._sha256(CLIENT_CHALLENGE_SEED)
 
-    async def _post(self, url: str, payload: dict[str, Any]) -> Any:
-        async with self._session.post(url, json=payload, timeout=30) as resp:
+    async def _request(self, method: str, url: str, payload: dict[str, Any] | None = None) -> Any:
+        """Send a request to Videofied Cloud.
+
+        The Videofied app family uses a mix of POST JSON and GET query parameters
+        depending on the backend host returned after authentication (rsiapp-a1, app3-a2, ...).
+        """
+        payload = payload or {}
+        if method.upper() == "GET":
+            request = self._session.get(url, params=payload, timeout=30)
+        else:
+            request = self._session.post(url, json=payload, timeout=30)
+
+        async with request as resp:
             text = await resp.text()
             if resp.status >= 400:
-                raise VideofiedApiError(f"HTTP {resp.status}: {text[:200]}")
+                raise VideofiedApiError(f"HTTP {resp.status}: {text[:300]}")
             try:
                 return await resp.json(content_type=None)
             except Exception as err:  # noqa: BLE001
-                raise VideofiedApiError(f"Invalid JSON response from {url}: {text[:200]}") from err
+                raise VideofiedApiError(f"Invalid JSON response from {url}: {text[:300]}") from err
+
+    async def _post(self, url: str, payload: dict[str, Any]) -> Any:
+        return await self._request("POST", url, payload)
+
+    async def _get(self, url: str, payload: dict[str, Any] | None = None) -> Any:
+        return await self._request("GET", url, payload or {})
+
+    async def _get_then_post(self, url: str, payload: dict[str, Any]) -> Any:
+        """Prefer GET, fallback to POST for older Videofied hosts."""
+        try:
+            return await self._get(url, payload)
+        except VideofiedApiError as get_err:
+            _LOGGER.debug("GET failed for %s, falling back to POST: %s", url, get_err)
+            return await self._post(url, payload)
 
     async def authenticate(self) -> None:
         """Authenticate and populate token, panel and host."""
@@ -95,18 +120,18 @@ class VideofiedCloudApi:
         await self.ensure_authenticated()
         assert self.host and self.token
         try:
-            return await self._post(f"{self.host}/node-app/getpanelinfo", {"token": self.token})
+            return await self._get_then_post(f"{self.host}/node-app/getpanelinfo", {"token": self.token})
         except VideofiedApiError:
             # Token may be expired. Authenticate once and retry.
             _LOGGER.debug("Panel info failed; re-authenticating")
             await self.authenticate()
             assert self.host and self.token
-            return await self._post(f"{self.host}/node-app/getpanelinfo", {"token": self.token})
+            return await self._get_then_post(f"{self.host}/node-app/getpanelinfo", {"token": self.token})
 
     async def get_events_list(self, offset: int = 0, media_only: bool = False) -> list[dict[str, Any]]:
         await self.ensure_authenticated()
         assert self.host and self.token
-        data = await self._post(
+        data = await self._get_then_post(
             f"{self.host}/node-app/getEventsList",
             {"token": self.token, "offset": offset, "mediaOnly": media_only},
         )
