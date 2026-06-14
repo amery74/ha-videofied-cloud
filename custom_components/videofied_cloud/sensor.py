@@ -13,72 +13,53 @@ from .coordinator import VideofiedDataCoordinator
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     coordinator: VideofiedDataCoordinator = hass.data[DOMAIN][entry.entry_id]
     entities: list[SensorEntity] = [
-        VideofiedConnectionSensor(coordinator, entry.entry_id),
-        VideofiedZoneStatusSensor(coordinator, entry.entry_id),
+        VideofiedSimpleSensor(coordinator, entry.entry_id, "connection", "Connection"),
+        VideofiedSimpleSensor(coordinator, entry.entry_id, "last_event", "Last Event"),
     ]
-    devices = coordinator.data.get("data", {}).get("devices", {})
-    for dev_id, device in devices.items():
-        entities.append(VideofiedDeviceBatterySensor(coordinator, entry.entry_id, dev_id, device.get("name", dev_id)))
-        entities.append(VideofiedDeviceStatusSensor(coordinator, entry.entry_id, dev_id, device.get("name", dev_id)))
-        entities.append(VideofiedDeviceTemperatureSensor(coordinator, entry.entry_id, dev_id, device.get("name", dev_id)))
+
+    devices = _panel_data(coordinator).get("devices", {})
+    for dev_id, dev in devices.items():
+        name = dev.get("name") or f"Device {dev_id}"
+        entities.append(VideofiedDeviceSensor(coordinator, entry.entry_id, dev_id, name, "battery"))
+        entities.append(VideofiedDeviceSensor(coordinator, entry.entry_id, dev_id, name, "status"))
+        entities.append(VideofiedDeviceSensor(coordinator, entry.entry_id, dev_id, name, "temperature"))
+
     async_add_entities(entities)
 
 
-class VideofiedBaseSensor(CoordinatorEntity[VideofiedDataCoordinator], SensorEntity):
-    def __init__(self, coordinator: VideofiedDataCoordinator, unique_id: str, name: str) -> None:
+def _panel_data(coordinator: VideofiedDataCoordinator) -> dict:
+    info = coordinator.data.get("panel_info", {}) if coordinator.data else {}
+    return info.get("data", {})
+
+
+class VideofiedSimpleSensor(CoordinatorEntity[VideofiedDataCoordinator], SensorEntity):
+    def __init__(self, coordinator: VideofiedDataCoordinator, entry_id: str, key: str, name: str) -> None:
         super().__init__(coordinator)
-        self._attr_unique_id = unique_id
-        self._attr_name = name
-
-
-class VideofiedConnectionSensor(VideofiedBaseSensor):
-    def __init__(self, coordinator, entry_id):
-        super().__init__(coordinator, f"{entry_id}_connection", "Videofied Connection")
+        self.key = key
+        self._attr_unique_id = f"{entry_id}_{key}"
+        self._attr_name = f"Videofied {name}"
 
     @property
     def native_value(self):
-        return self.coordinator.data.get("data", {}).get("connection")
+        if self.key == "connection":
+            return _panel_data(self.coordinator).get("connection")
+        if self.key == "last_event":
+            events = self.coordinator.data.get("events", []) if self.coordinator.data else []
+            if events:
+                return events[0].get("Event") or events[0].get("Name")
+        return None
 
 
-class VideofiedZoneStatusSensor(VideofiedBaseSensor):
-    def __init__(self, coordinator, entry_id):
-        super().__init__(coordinator, f"{entry_id}_zone_1_status", "Videofied Zone 1 Status")
-
-    @property
-    def native_value(self):
-        return self.coordinator.data.get("data", {}).get("zones", {}).get("Zone 1", {}).get("realstatus")
-
-
-class VideofiedDeviceBatterySensor(VideofiedBaseSensor):
-    def __init__(self, coordinator, entry_id, dev_id, dev_name):
-        super().__init__(coordinator, f"{entry_id}_device_{dev_id}_battery", f"Videofied {dev_name} Battery")
-        self.dev_id = dev_id
-
-    @property
-    def native_value(self):
-        return self.coordinator.data.get("data", {}).get("devices", {}).get(self.dev_id, {}).get("battery")
-
-
-class VideofiedDeviceStatusSensor(VideofiedBaseSensor):
-    def __init__(self, coordinator, entry_id, dev_id, dev_name):
-        super().__init__(coordinator, f"{entry_id}_device_{dev_id}_status", f"Videofied {dev_name} Status")
-        self.dev_id = dev_id
+class VideofiedDeviceSensor(CoordinatorEntity[VideofiedDataCoordinator], SensorEntity):
+    def __init__(self, coordinator: VideofiedDataCoordinator, entry_id: str, dev_id: str, dev_name: str, field: str) -> None:
+        super().__init__(coordinator)
+        self.dev_id = str(dev_id)
+        self.field = field
+        safe_name = dev_name.replace("$", " ").strip()
+        self._attr_unique_id = f"{entry_id}_device_{dev_id}_{field}"
+        self._attr_name = f"Videofied {safe_name} {field.title()}"
 
     @property
     def native_value(self):
-        return self.coordinator.data.get("data", {}).get("devices", {}).get(self.dev_id, {}).get("status")
-
-
-class VideofiedDeviceTemperatureSensor(VideofiedBaseSensor):
-    def __init__(self, coordinator, entry_id, dev_id, dev_name):
-        super().__init__(coordinator, f"{entry_id}_device_{dev_id}_temperature", f"Videofied {dev_name} Temperature")
-        self.dev_id = dev_id
-        self._attr_native_unit_of_measurement = "°C"
-
-    @property
-    def native_value(self):
-        value = self.coordinator.data.get("data", {}).get("devices", {}).get(self.dev_id, {}).get("temperature")
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            return value
+        device = _panel_data(self.coordinator).get("devices", {}).get(self.dev_id, {})
+        return device.get(self.field)

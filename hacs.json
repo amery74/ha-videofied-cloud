@@ -1,7 +1,6 @@
 {
   "name": "Videofied Cloud",
-  "content_in_root": false,
   "render_readme": true,
-  "domains": ["alarm_control_panel", "sensor", "button", "camera"],
+  "domains": ["alarm_control_panel", "sensor", "camera", "button"],
   "homeassistant": "2024.6.0"
 }

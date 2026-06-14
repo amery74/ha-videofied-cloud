@@ -3,15 +3,16 @@
     "step": {
       "user": {
         "title": "Videofied Cloud",
-        "description": "Saisissez vos identifiants Videofied / RSI Connected Home.",
+        "description": "Saisissez vos identifiants Videofied Cloud.",
         "data": {
-          "email": "Adresse e-mail",
+          "email": "Email",
           "password": "Mot de passe"
         }
       }
     },
     "error": {
-      "cannot_connect": "Connexion ou authentification impossible"
+      "auth": "Authentification impossible",
+      "unknown": "Erreur inattendue"
     }
   }
 }

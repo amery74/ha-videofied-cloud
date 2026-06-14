@@ -12,25 +12,28 @@ from .coordinator import VideofiedDataCoordinator
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     coordinator: VideofiedDataCoordinator = hass.data[DOMAIN][entry.entry_id]
-    entities: list[Camera] = []
-    for dev_id, device in coordinator.data.get("data", {}).get("devices", {}).items():
-        if device.get("type") == "Streaming":
-            entities.append(VideofiedCamera(coordinator, entry.entry_id, dev_id, device.get("name", dev_id)))
+    devices = _panel_data(coordinator).get("devices", {})
+    entities = []
+    for dev_id, dev in devices.items():
+        if dev.get("type") == "Streaming":
+            entities.append(VideofiedCamera(coordinator, entry.entry_id, dev_id, dev.get("name") or f"Camera {dev_id}"))
     async_add_entities(entities)
 
 
+def _panel_data(coordinator: VideofiedDataCoordinator) -> dict:
+    info = coordinator.data.get("panel_info", {}) if coordinator.data else {}
+    return info.get("data", {})
+
+
 class VideofiedCamera(CoordinatorEntity[VideofiedDataCoordinator], Camera):
-    def __init__(self, coordinator: VideofiedDataCoordinator, entry_id: str, camera_id: str, camera_name: str) -> None:
-        Camera.__init__(self)
+    def __init__(self, coordinator: VideofiedDataCoordinator, entry_id: str, camera_id: str, name: str) -> None:
         CoordinatorEntity.__init__(self, coordinator)
-        self.camera_id = camera_id
+        Camera.__init__(self)
+        self.camera_id = str(camera_id)
+        safe_name = name.replace("$", " ").strip()
         self._attr_unique_id = f"{entry_id}_camera_{camera_id}"
-        self._attr_name = f"Videofied {camera_name}"
-        self._last_image: bytes | None = None
+        self._attr_name = f"Videofied {safe_name}"
+        self._attr_should_poll = True
 
     async def async_camera_image(self, width: int | None = None, height: int | None = None) -> bytes | None:
-        event = await self.coordinator.api.get_latest_picture_event(self.camera_id)
-        if not event:
-            return self._last_image
-        self._last_image = await self.coordinator.api.download_picture(event["PictureURI"], event["PictureToken"])
-        return self._last_image
+        return await self.coordinator.async_update_picture(self.camera_id)

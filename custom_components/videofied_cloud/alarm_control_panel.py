@@ -10,12 +10,6 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN
 from .coordinator import VideofiedDataCoordinator
 
-STATE_MAP = {
-    "Disarm": AlarmControlPanelState.DISARMED,
-    "Normal": AlarmControlPanelState.ARMED_AWAY,
-    "External": AlarmControlPanelState.ARMED_HOME,
-}
-
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     coordinator: VideofiedDataCoordinator = hass.data[DOMAIN][entry.entry_id]
@@ -32,20 +26,20 @@ class VideofiedAlarmPanel(CoordinatorEntity[VideofiedDataCoordinator], AlarmCont
 
     @property
     def alarm_state(self) -> AlarmControlPanelState | None:
-        try:
-            status = self.coordinator.data["data"]["zones"]["Zone 1"]["realstatus"]
-        except Exception:
-            return None
-        return STATE_MAP.get(status, AlarmControlPanelState.UNKNOWN)
+        state = self._zone.get("realstatus") or self._zone.get("status")
+        if state == "Disarm":
+            return AlarmControlPanelState.DISARMED
+        if state == "Normal":
+            return AlarmControlPanelState.ARMED_AWAY
+        if state == "External":
+            return AlarmControlPanelState.ARMED_HOME
+        return None
 
     @property
-    def extra_state_attributes(self):
-        data = self.coordinator.data.get("data", {})
-        zone = data.get("zones", {}).get("Zone 1", {})
-        return {
-            "raw_status": zone.get("status"),
-            "realstatus": zone.get("realstatus"),
-            "lockmode": zone.get("lockmode"),
-            "connection": data.get("connection"),
-            "serial": data.get("serial"),
-        }
+    def _zone(self) -> dict:
+        info = self.coordinator.data.get("panel_info", {}) if self.coordinator.data else {}
+        return info.get("data", {}).get("zones", {}).get("Zone 1", {})
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        return dict(self._zone)

@@ -1,46 +1,34 @@
-# Videofied Cloud for Home Assistant
+# ha-videofied-cloud
 
-Custom Home Assistant integration for Videofied / RSI Connected Home cloud alarm systems.
+Home Assistant custom integration for Videofied / RSI Cloud alarm systems.
 
-## Features
+## Current status
 
-Current V1:
+Experimental V0.1.1.
 
-- Login with email and password
-- Automatic token generation
-- Read alarm panel state from Videofied Cloud
-- Read panel connection status
-- Read devices, battery, status and temperature
-- Read latest image event from the event history
-- Download latest received picture
-- Button to request a new picture from streaming detectors
+Features:
 
-Planned V2:
+- Login with email and password.
+- Automatic token generation.
+- Read-only alarm state.
+- Device sensors for battery/status/temperature.
+- Last image camera from event history.
+- Buttons to request a picture from camera detectors.
 
-- Arm / disarm support
-- Better camera handling
-- HACS default repository support
+Not implemented yet:
 
-## Installation
+- Arm / disarm commands.
 
-Copy the folder:
+## Installation via HACS custom repository
 
-```text
-custom_components/videofied_cloud
-```
+1. HACS → Integrations → Custom repositories.
+2. Add: `https://github.com/amery74/ha-videofied-cloud`
+3. Category: Integration.
+4. Download **Videofied Cloud**.
+5. Restart Home Assistant.
+6. Settings → Devices & services → Add integration → **Videofied Cloud**.
 
-to:
+## Warning
 
-```text
-/config/custom_components/videofied_cloud
-```
-
-Restart Home Assistant, then add the integration from:
-
-```text
-Settings → Devices & services → Add integration → Videofied Cloud
-```
-
-## Disclaimer
-
-This project is community-made and is not affiliated with Videofied, RSI, Resideo, or TSP Sécurité.
+This is an unofficial integration based on observed Videofied Cloud API behavior.
+Use at your own risk and do not rely on it as the only alarm notification path.

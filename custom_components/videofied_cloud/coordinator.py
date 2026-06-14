@@ -1,27 +1,48 @@
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 from typing import Any
 
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from .api import VideofiedCloudApi, VideofiedCloudApiError
-from .const import DEFAULT_SCAN_INTERVAL_SECONDS, DOMAIN
+from .api import VideofiedCloudApi
+from .const import DOMAIN, DEFAULT_SCAN_INTERVAL
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class VideofiedDataCoordinator(DataUpdateCoordinator[dict[str, Any]]):
+    """Coordinator for Videofied Cloud data."""
+
     def __init__(self, hass: HomeAssistant, api: VideofiedCloudApi) -> None:
         super().__init__(
             hass,
-            hass.logger,
+            _LOGGER,
             name=DOMAIN,
-            update_interval=timedelta(seconds=DEFAULT_SCAN_INTERVAL_SECONDS),
+            update_interval=timedelta(seconds=DEFAULT_SCAN_INTERVAL),
         )
         self.api = api
+        self.last_picture: dict[str, bytes] = {}
+        self.last_picture_event: dict[str, dict[str, Any]] = {}
 
     async def _async_update_data(self) -> dict[str, Any]:
-        try:
-            return await self.api.get_panel_info()
-        except VideofiedCloudApiError as err:
-            raise UpdateFailed(str(err)) from err
+        info = await self.api.get_panel_info()
+        events = await self.api.get_events_list(offset=0, media_only=False)
+        return {"panel_info": info, "events": events}
+
+    async def async_take_picture(self, camera_index: str | int) -> None:
+        await self.api.take_picture(camera_index)
+        await self.async_request_refresh()
+
+    async def async_update_picture(self, camera_index: str | int) -> bytes | None:
+        event = await self.api.get_latest_picture_event(camera_index)
+        if not event:
+            return self.last_picture.get(str(camera_index))
+        image = await self.api.download_picture_from_event(event)
+        if image:
+            key = str(camera_index)
+            self.last_picture[key] = image
+            self.last_picture_event[key] = event
+        return image
