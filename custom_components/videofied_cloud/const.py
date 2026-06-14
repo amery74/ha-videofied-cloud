@@ -5,6 +5,7 @@ CONF_PASSWORD = "password"
 
 DEFAULT_SCAN_INTERVAL = 60
 PICTURE_DELAY_SECONDS = 25
+IMAGE_HOST = "https://www.videofiednuage.com/app3-a2"
 
 BASE_URL = "https://www.videofiednuage.com"
 CLIENT_CHALLENGE_SEED = "dhsjeyurhdfd"

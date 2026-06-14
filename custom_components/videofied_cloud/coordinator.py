@@ -40,7 +40,9 @@ class VideofiedDataCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         takePicture returns picture_status=0. The official app typically sees
         the new PictureReceived event about 25 seconds later.
         """
-        await self.api.take_picture(camera_index)
+        result = await self.api.take_picture(camera_index)
+        if isinstance(result, dict) and result.get("picture_status") not in (0, "0", None):
+            raise VideofiedApiError(f"Unexpected picture response: {result}")
         await asyncio.sleep(PICTURE_DELAY_SECONDS)
         await self.async_request_refresh()
         await self.async_update_picture(camera_index)

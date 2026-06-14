@@ -7,7 +7,7 @@ from urllib.parse import quote
 
 import aiohttp
 
-from .const import APP_VERSION, BASE_URL, CLIENT_CHALLENGE_SEED, PASSWORD_PREFIX
+from .const import APP_VERSION, BASE_URL, CLIENT_CHALLENGE_SEED, IMAGE_HOST, PASSWORD_PREFIX
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -136,9 +136,11 @@ class VideofiedCloudApi:
 
     async def get_events_list(self, offset: int = 0, media_only: bool = False) -> list[dict[str, Any]]:
         await self.ensure_authenticated()
-        assert self.host and self.token
+        assert self.token
+        # The official app may authenticate against rsiapp-b1 while media/history
+        # endpoints work on app3-a2. Use the app3-a2 media host first.
         data = await self._get_then_post(
-            f"{self.host}/node-app/getEventsList",
+            f"{IMAGE_HOST}/node-app/getEventsList",
             {"token": self.token, "offset": offset, "mediaOnly": media_only},
         )
         if isinstance(data, list):
@@ -149,9 +151,10 @@ class VideofiedCloudApi:
 
     async def take_picture(self, camera_index: str | int) -> dict[str, Any]:
         await self.ensure_authenticated()
-        assert self.host and self.token
+        assert self.token
+        # takePicture was validated against app3-a2 even when auth returns rsiapp-b1.
         return await self._post(
-            f"{self.host}/node-app/takePicture",
+            f"{IMAGE_HOST}/node-app/takePicture",
             {"token": self.token, "camera_index": str(camera_index)},
         )
 
@@ -175,7 +178,6 @@ class VideofiedCloudApi:
         the mobile apps.
         """
         await self.ensure_authenticated()
-        assert self.host
         uri = event.get("PictureURI")
         pic_token = event.get("PictureToken")
         if not uri or not pic_token:
@@ -195,7 +197,7 @@ class VideofiedCloudApi:
             _LOGGER.debug("Direct image download exception: %s", err)
 
         # Older rsiapp hosts use node-app/proxy?uri=<encoded URI + token>.
-        proxy_url = f"{self.host}/node-app/proxy?uri=" + quote(
+        proxy_url = f"{IMAGE_HOST}/node-app/proxy?uri=" + quote(
             f"{uri}?authenticationbearer={pic_token}", safe=""
         )
         async with self._session.get(proxy_url, timeout=30) as resp:
