@@ -6,7 +6,7 @@ Home Assistant custom integration for Videofied Cloud / RSI / TSP alarm systems.
 
 Experimental integration generated from observed Videofied Cloud traffic.
 
-### v0.1.2
+### v0.1.3
 
 - Fixes backend variants using `app3-a2`.
 - Uses the authenticated panel host dynamically.
@@ -33,3 +33,9 @@ Restart Home Assistant, then add **Videofied Cloud** from Settings → Devices &
 ## Warning
 
 This is unofficial and not affiliated with Videofied, RSI, or TSP. Use at your own risk.
+
+
+## Changelog
+
+### 0.1.3
+- Fix boolean query parameters for Home Assistant/aiohttp GET requests.

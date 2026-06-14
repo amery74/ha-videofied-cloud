@@ -47,7 +47,13 @@ class VideofiedCloudApi:
         """
         payload = payload or {}
         if method.upper() == "GET":
-            request = self._session.get(url, params=payload, timeout=30)
+            # aiohttp/yarl does not accept bool values as query params.
+            # The Videofied API expects lowercase JSON-like booleans in GET queries.
+            params = {
+                key: ("true" if value is True else "false" if value is False else value)
+                for key, value in payload.items()
+            }
+            request = self._session.get(url, params=params, timeout=30)
         else:
             request = self._session.post(url, json=payload, timeout=30)
 
