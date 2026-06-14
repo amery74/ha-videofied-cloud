@@ -6,7 +6,7 @@ Home Assistant custom integration for Videofied Cloud / RSI / TSP alarm systems.
 
 Experimental integration generated from observed Videofied Cloud traffic.
 
-### v0.1.3
+### v0.1.5
 
 - Fixes backend variants using `app3-a2`.
 - Uses the authenticated panel host dynamically.
@@ -37,5 +37,18 @@ This is unofficial and not affiliated with Videofied, RSI, or TSP. Use at your o
 
 ## Changelog
 
-### 0.1.3
+### 0.1.5
 - Fix boolean query parameters for Home Assistant/aiohttp GET requests.
+
+
+## v0.1.5
+
+- Handle `TAKE_PICTURE_ERROR` as a friendly Home Assistant service error.
+- Avoid camera stream tracebacks when an image URL is expired or rejected.
+- Try direct image download before the Videofied proxy endpoint.
+
+
+## v0.1.5
+
+- Adds a 25 second wait after `takePicture` before refreshing events and downloading the new MotionViewer image.
+- This matches the observed delay in the official Videofied app.

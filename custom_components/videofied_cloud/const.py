@@ -4,6 +4,7 @@ CONF_EMAIL = "email"
 CONF_PASSWORD = "password"
 
 DEFAULT_SCAN_INTERVAL = 60
+PICTURE_DELAY_SECONDS = 25
 
 BASE_URL = "https://www.videofiednuage.com"
 CLIENT_CHALLENGE_SEED = "dhsjeyurhdfd"

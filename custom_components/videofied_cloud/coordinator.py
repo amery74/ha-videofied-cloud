@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import timedelta
 from typing import Any
@@ -7,8 +8,8 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from .api import VideofiedCloudApi
-from .const import DOMAIN, DEFAULT_SCAN_INTERVAL
+from .api import VideofiedApiError, VideofiedCloudApi
+from .const import DOMAIN, DEFAULT_SCAN_INTERVAL, PICTURE_DELAY_SECONDS
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -33,16 +34,29 @@ class VideofiedDataCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return {"panel_info": info, "events": events}
 
     async def async_take_picture(self, camera_index: str | int) -> None:
+        """Request a new picture and wait for the panel/cloud to publish it.
+
+        Videofied MotionViewer pictures are not available immediately after
+        takePicture returns picture_status=0. The official app typically sees
+        the new PictureReceived event about 25 seconds later.
+        """
         await self.api.take_picture(camera_index)
+        await asyncio.sleep(PICTURE_DELAY_SECONDS)
         await self.async_request_refresh()
+        await self.async_update_picture(camera_index)
 
     async def async_update_picture(self, camera_index: str | int) -> bytes | None:
+        key = str(camera_index)
         event = await self.api.get_latest_picture_event(camera_index)
         if not event:
-            return self.last_picture.get(str(camera_index))
-        image = await self.api.download_picture_from_event(event)
+            return self.last_picture.get(key)
+        try:
+            image = await self.api.download_picture_from_event(event)
+        except VideofiedApiError as err:
+            _LOGGER.warning("Unable to download Videofied picture for camera %s: %s", camera_index, err)
+            return self.last_picture.get(key)
         if image:
-            key = str(camera_index)
             self.last_picture[key] = image
             self.last_picture_event[key] = event
-        return image
+            return image
+        return self.last_picture.get(key)

@@ -4,9 +4,11 @@ from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
+from .api import VideofiedApiError
 from .coordinator import VideofiedDataCoordinator
 
 
@@ -34,4 +36,12 @@ class VideofiedTakePictureButton(CoordinatorEntity[VideofiedDataCoordinator], Bu
         self._attr_name = f"Videofied {safe_name} Take Picture"
 
     async def async_press(self) -> None:
-        await self.coordinator.async_take_picture(self.camera_id)
+        try:
+            await self.coordinator.async_take_picture(self.camera_id)
+        except VideofiedApiError as err:
+            message = str(err)
+            if "TAKE_PICTURE_ERROR" in message:
+                raise HomeAssistantError(
+                    "Videofied refused the picture request. The detector may be unavailable, asleep, or a picture request may have been made too recently."
+                ) from err
+            raise HomeAssistantError(f"Videofied picture request failed: {message}") from err

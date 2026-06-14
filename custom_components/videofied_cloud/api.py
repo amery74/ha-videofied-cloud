@@ -168,16 +168,38 @@ class VideofiedCloudApi:
         return None
 
     async def download_picture_from_event(self, event: dict[str, Any]) -> bytes | None:
+        """Download a picture from a PictureReceived event.
+
+        Depending on the backend host, Videofied exposes either a direct file URL
+        or a proxy endpoint. Try direct download first, then the proxy URL used by
+        the mobile apps.
+        """
         await self.ensure_authenticated()
         assert self.host
         uri = event.get("PictureURI")
         pic_token = event.get("PictureToken")
         if not uri or not pic_token:
             return None
+
+        # Newer app3 hosts expose a direct /files/...jpg URL.
+        try:
+            async with self._session.get(
+                uri,
+                params={"authenticationbearer": pic_token},
+                timeout=30,
+            ) as resp:
+                if resp.status < 400:
+                    return await resp.read()
+                _LOGGER.debug("Direct image download failed: HTTP %s", resp.status)
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("Direct image download exception: %s", err)
+
+        # Older rsiapp hosts use node-app/proxy?uri=<encoded URI + token>.
         proxy_url = f"{self.host}/node-app/proxy?uri=" + quote(
             f"{uri}?authenticationbearer={pic_token}", safe=""
         )
         async with self._session.get(proxy_url, timeout=30) as resp:
             if resp.status >= 400:
-                raise VideofiedApiError(f"Image HTTP {resp.status}")
+                text = await resp.text()
+                raise VideofiedApiError(f"Image HTTP {resp.status}: {text[:200]}")
             return await resp.read()
